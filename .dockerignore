@@ -1,0 +1,35 @@
+# Node modules locales (no deben copiarse al build context)
+node_modules/
+# Carpeta de build local (o artefactos antes de Docker)
+dist/
+build/
+# Archivos de sistema / dependencias de IDE
+.vscode/
+.idea/
+.DS_Store
+# Control de versiones
+.git/
+.gitignore
+# Archivos de entorno sensibles
+.env
+.env.*    # por ejemplo .env.production, .env.local
+# Logs, dumps, temporales
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Dockerfile y .dockerignore (no se necesita que se copien internamente)
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+# Configs locales de desarrollo
+.env.local
+.env.development.local
+# Archivos de test que no necesita la imagen final (opcional)
+tests/
+__tests__/
+coverage/
+# Cualquier otro archivo grande o de recursos de desarrollo que no sirve en producción
+*.md
+*.markdown
+README*
