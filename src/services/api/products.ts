@@ -11,5 +11,8 @@ export const productsApi = {
 export const productTypesApi = {
   list: (params?: any) => client.get('/product-types', { params }).then(r => r.data),
   get: (id: string | number) => client.get(`/product-types/${id}`).then(r => r.data),
+  create: (payload: any) => client.post('/product-types', payload).then(r => r.data),
+  update: (id: string | number, payload: any) => client.put(`/product-types/${id}`, payload).then(r => r.data),
+  remove: (id: string | number) => client.delete(`/product-types/${id}`).then(r => r.data),
 }
 

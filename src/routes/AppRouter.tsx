@@ -11,6 +11,8 @@ import Entries from '../pages/Inventory/Entries'
 import Dashboard from '../pages/Dashboard'
 import Exits from '../pages/Inventory/Exits'
 import AdminUsers from '../pages/Admin/Users'
+import ProductTypes from '../pages/Admin/ProductTypes'
+import Laboratories from '../pages/Admin/Laboratories'
 
 const AppRouter: React.FC = () => {
   const { token, ready, user } = useContext(AuthContext)
@@ -35,6 +37,8 @@ const AppRouter: React.FC = () => {
             <>
               <Route path="staff/create" element={<RegisterAdmin />} />
               <Route path="usuarios" element={<AdminUsers />} />
+              <Route path="tipos-productos" element={<ProductTypes />} />
+              <Route path="laboratorios" element={<Laboratories />} />
             </>
           )}
           <Route path="entradas" element={<Entries />} />

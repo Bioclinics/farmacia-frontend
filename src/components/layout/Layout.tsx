@@ -30,6 +30,8 @@ const Sidebar: React.FC = () => {
           <>
             <NavLink to="/staff/create" className={({isActive}) => `block px-3 py-2 rounded ${isActive ? 'bg-sky-800 text-white' : 'text-gray-700 hover:bg-sky-100'}`}>Gestionar personal</NavLink>
             <NavLink to="/usuarios" className={({isActive}) => `block px-3 py-2 rounded ${isActive ? 'bg-sky-800 text-white' : 'text-gray-700 hover:bg-sky-100'}`}>Usuarios</NavLink>
+            <NavLink to="/tipos-productos" className={({isActive}) => `block px-3 py-2 rounded ${isActive ? 'bg-sky-800 text-white' : 'text-gray-700 hover:bg-sky-100'}`}>Tipos de Productos</NavLink>
+            <NavLink to="/laboratorios" className={({isActive}) => `block px-3 py-2 rounded ${isActive ? 'bg-sky-800 text-white' : 'text-gray-700 hover:bg-sky-100'}`}>Laboratorios</NavLink>
           </>
         )}
       </nav>
