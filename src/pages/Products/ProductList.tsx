@@ -1,345 +1,447 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { AuthContext } from '../../context/AuthContext'
 import { productsApi, productTypesApi } from '../../services/api/products'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
+import { Badge } from '../../components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
+import { showError, showToast, confirmDelete, showLoading, closeLoading, showSuccess } from '../../lib/sweet-alert'
+import { Package, Plus, Edit2, Trash2, CheckCircle2, XCircle, Loader2, Search } from 'lucide-react'
 
 const ProductList: React.FC = () => {
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(10)
-  const [total, setTotal] = useState(0)
-  const [pages, setPages] = useState(1)
-  const [editing, setEditing] = useState<any | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const { user } = useContext(AuthContext)
-  const isAdmin = user?.idRole === 2
+	const [items, setItems] = useState<any[]>([])
+	const [loading, setLoading] = useState(false)
+	const [query, setQuery] = useState('')
+	const [page, setPage] = useState(1)
+	const [limit, setLimit] = useState(10)
+	const [total, setTotal] = useState(0)
+	const [pages, setPages] = useState(1)
+	const [editing, setEditing] = useState<any | null>(null)
+	const [showForm, setShowForm] = useState(false)
+	const { user } = useContext(AuthContext)
+	const isAdmin = user?.idRole === 2
 
-  const fetch = async (q = query, p = page, l = limit) => {
-    setLoading(true)
-    try {
-      const data = await productsApi.list({ q, page: p, limit: l })
-      // backend returns paginated { data, total, page, limit, pages }
-      if (data && Array.isArray(data.data)) {
-        setItems(data.data)
-        setTotal(data.total ?? 0)
-        setPages(data.pages ?? 1)
-        setPage(data.page ?? p)
-        setLimit(data.limit ?? l)
-      } else if (Array.isArray(data)) {
-        setItems(data)
-        setTotal(data.length)
-        setPages(1)
-        setPage(1)
-      } else if (data?.items && Array.isArray(data.items)) {
-        setItems(data.items)
-        setTotal(data.total ?? 0)
-        setPages(data.pages ?? 1)
-      } else {
-        setItems([])
-        setTotal(0)
-        setPages(1)
-      }
-    } catch (err) {
-      console.error(err)
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }
+	const fetchProducts = async (pageNum: number, limitNum: number, queryStr: string) => {
+		try {
+			setLoading(true)
+			const params = { q: queryStr, page: pageNum, limit: limitNum }
+			const data = await productsApi.list(params)
 
-  useEffect(() => {
-    // initial load
-    fetch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+			const itemsData = data?.data || data?.items || data || []
+			const totalItems = data?.total ?? (Array.isArray(itemsData) ? itemsData.length : 0)
+			const pagesCount = limitNum > 0 ? Math.max(1, Math.ceil(totalItems / limitNum)) : 1
 
-  // debounce for search
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setPage(1)
-      fetch(query, 1, limit)
-    }, 450)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
+			setItems(Array.isArray(itemsData) ? itemsData : [])
+			setTotal(totalItems)
+			setPages(pagesCount)
+		} catch (error) {
+			showError('Error', 'No se pudo cargar los productos')
+			console.error(error)
+		} finally {
+			setLoading(false)
+		}
+	}
 
-  useEffect(() => {
-    fetch(query, page, limit)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit])
+	useEffect(() => {
+		fetchProducts(1, limit, '')
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [])
 
-  const onDelete = async (id: number | string) => {
-    if (!confirm('¿Eliminar producto?')) return
-    try {
-      await productsApi.remove(id)
-      fetch()
-    } catch (err: any) {
-      console.error(err)
-      alert(err?.message || 'Error eliminando')
-    }
-  }
+	// debounce for search
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setPage(1)
+			fetchProducts(1, limit, query)
+		}, 450)
+		return () => clearTimeout(timer)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [query])
 
-  const toggleActive = async (p: any) => {
-    try {
-      const idProd = p.id_product ?? p.id
-      const newState = !p.is_active
-      console.log('[toggleActive] Producto:', { id: idProd, currentState: p.is_active, newState })
-      
-      // Use PATCH /activate or /deactivate endpoints (no body needed)
-      const endpoint = newState ? `/products/${idProd}/activate` : `/products/${idProd}/deactivate`
-      const url = `${import.meta.env.VITE_API_URL}${endpoint}`
-      console.log('[toggleActive] Calling:', { method: 'PATCH', url })
-      
-      const response = await window.fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('bioclinics_token')}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      console.log('[toggleActive] Response status:', response.status, response.statusText)
-      
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.message || 'Error actualizando estado')
-      }
-      
-      fetch()
-    } catch (err: any) {
-      console.error('[toggleActive] Error:', err)
-      alert(err?.message || 'Error actualizando estado')
-    }
-  }
+	useEffect(() => {
+		fetchProducts(page, limit, query)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [page, limit])
 
-  const openNew = () => {
-    setEditing(null)
-    setShowForm(true)
-  }
+	const toggleActive = async (p: any) => {
+		try {
+			const idProd = p.id_product ?? p.id
+			const newState = !p.is_active
+			const endpoint = newState ? `/products/${idProd}/activate` : `/products/${idProd}/deactivate`
+			const url = `${import.meta.env.VITE_API_URL}${endpoint}`
+			showLoading()
+			const response = await window.fetch(url, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${localStorage.getItem('bioclinics_token')}`,
+					'Content-Type': 'application/json'
+				}
+			})
+			if (!response.ok) {
+				const data = await response.json()
+				closeLoading()
+				showError('Error', data.message || 'Error actualizando estado')
+				return
+			}
+			closeLoading()
+			showToast('success', newState ? 'Producto activado' : 'Producto desactivado')
+			fetchProducts(page, limit, query)
+		} catch (err: any) {
+			closeLoading()
+			showError('Error', err?.message || 'Error actualizando estado')
+			console.error('[toggleActive] Error:', err)
+		}
+	}
 
-  const openEdit = (p: any) => {
-    setEditing(p)
-    setShowForm(true)
-  }
+	const onDelete = async (productId: any) => {
+		const result = await confirmDelete('¿Eliminar producto?')
+		if (!result.isConfirmed) return
+		try {
+			showLoading()
+			await productsApi.remove(productId)
+			closeLoading()
+			showSuccess('Producto eliminado')
+			fetchProducts(page, limit, query)
+		} catch (err: any) {
+			closeLoading()
+			showError('Error', err?.message || 'Error eliminando producto')
+			console.error('[onDelete] Error:', err)
+		}
+	}
 
-  const submitForm = async (payload: any) => {
-    try {
-      console.log('[submitForm] Payload being sent:', payload)
-      if (editing) {
-        await productsApi.update(editing.id_product ?? editing.id, payload)
-      } else {
-        await productsApi.create(payload)
-      }
-      setShowForm(false)
-      fetch()
-    } catch (err: any) {
-      console.error(err)
-      alert(err?.message || 'Error guardando')
-    }
-  }
+	const openNew = () => {
+		setEditing(null)
+		setShowForm(true)
+	}
 
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-sky-700">Productos</h2>
-          <p className="text-sm text-gray-500">Administra productos: buscar, paginar y acciones rápidas.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar por nombre..."
-            className="px-3 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-          />
-          {isAdmin && (
-            <button onClick={openNew} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg shadow">Nuevo producto</button>
-          )}
-        </div>
-      </div>
+	const openEdit = (p: any) => {
+		setEditing(p)
+		setShowForm(true)
+	}
 
-      <div className="bg-white rounded-lg shadow overflow-auto">
-        <table className="min-w-full table-auto">
-          <thead className="bg-sky-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm text-gray-600">Nombre</th>
-              <th className="px-4 py-3 text-left text-sm text-gray-600">Tipo</th>
-              <th className="px-4 py-3 text-right text-sm text-gray-600">Precio</th>
-              <th className="px-4 py-3 text-right text-sm text-gray-600">Stock</th>
-              <th className="px-4 py-3 text-center text-sm text-gray-600">Estado</th>
-              <th className="px-4 py-3 text-center text-sm text-gray-600">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="p-6 text-center">Cargando...</td>
-              </tr>
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-6 text-center text-gray-500">No se encontraron productos</td>
-              </tr>
-            ) : (
-              items.map((p: any) => (
-                <tr key={p.id_product ?? p.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-sky-700">{p.name || p.description || p.nombre}</div>
-                    <div className="text-xs text-gray-500">{p.sku ? `SKU: ${p.sku}` : ''}</div>
-                  </td>
-                  <td className="px-4 py-3">{p.productType?.name ?? p.typeName ?? '-'}</td>
-                  <td className="px-4 py-3 text-right">{typeof p.price !== 'undefined' ? `$ ${Number(p.price).toFixed(2)}` : '-'}</td>
-                  <td className="px-4 py-3 text-right">{p.stock ?? p.quantity ?? '-'}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {p.is_active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {isAdmin ? (
-                        <>
-                          <button onClick={() => openEdit(p)} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded">Editar</button>
-                          <button onClick={() => toggleActive(p)} className="px-2 py-1 text-xs border border-sky-300 text-sky-600 hover:bg-sky-50 rounded">{p.is_active ? 'Desactivar' : 'Activar'}</button>
-                          <button onClick={() => onDelete(p.id_product ?? p.id)} className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded">Eliminar</button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-gray-500">Sin acciones</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+	const submitForm = async (payload: any) => {
+		try {
+			showLoading()
+			if (editing) {
+				const editId = editing.id_product ?? editing.id
+				await productsApi.update(editId, payload)
+				showSuccess('Producto actualizado')
+			} else {
+				await productsApi.create(payload)
+				showSuccess('Producto creado')
+			}
+			closeLoading()
+			setShowForm(false)
+			fetchProducts(page, limit, query)
+		} catch (err: any) {
+			closeLoading()
+			showError('Error', err?.message || 'Error guardando producto')
+			console.error('[submitForm] Error:', err)
+		}
+	}
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600">Total: {total}</div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 border rounded">Prev</button>
-          <div className="px-3 py-1">{page} / {pages}</div>
-          <button onClick={() => setPage(p => Math.min(pages, p + 1))} className="px-3 py-1 border rounded">Next</button>
-          <select value={limit} onChange={e => setLimit(Number(e.target.value))} className="ml-2 px-2 py-1 border rounded">
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-          </select>
-        </div>
-      </div>
+	return (
+		<div className="space-y-6">
+			<Card className="border-l-4 border-l-primary">
+				<CardHeader>
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-3">
+							<Package className="w-6 h-6 text-primary" />
+							<div>
+								<CardTitle>Productos</CardTitle>
+								<CardDescription>Administra productos: buscar, paginar y acciones rápidas.</CardDescription>
+							</div>
+						</div>
+						{isAdmin && (
+							<Button onClick={openNew} className="gap-2">
+								<Plus className="w-4 h-4" />
+								Nuevo producto
+							</Button>
+						)}
+					</div>
+				</CardHeader>
+				<CardContent>
+					<div className="flex items-center gap-2">
+						<Search className="w-4 h-4 text-foreground/60" />
+						<Input
+							placeholder="Buscar por nombre, SKU..."
+							value={query}
+							onChange={e => setQuery(e.target.value)}
+							className="max-w-sm"
+						/>
+					</div>
+				</CardContent>
+			</Card>
 
-      {/* Simple modal form */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">{editing ? 'Editar producto' : 'Nuevo producto'}</h3>
-            <ProductForm initial={editing} onCancel={() => setShowForm(false)} onSave={submitForm} />
-          </div>
-        </div>
-      )}
-    </div>
-  )
+			<Card>
+				<CardHeader>
+					<CardTitle>Lista de Productos</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<div className="border rounded-lg overflow-auto">
+						<Table>
+							<TableHeader>
+								<TableRow className="bg-primary/5">
+									<TableHead>Nombre</TableHead>
+									<TableHead>Tipo</TableHead>
+									<TableHead className="text-right">Precio</TableHead>
+									<TableHead className="text-right">Stock</TableHead>
+									<TableHead className="text-center">Estado</TableHead>
+									<TableHead className="text-center">Acciones</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{loading ? (
+									<TableRow>
+										<TableCell colSpan={6} className="text-center py-8">
+											<div className="flex items-center justify-center gap-2">
+												<Loader2 className="w-4 h-4 animate-spin" />
+												<span>Cargando productos...</span>
+											</div>
+										</TableCell>
+									</TableRow>
+								) : items.length === 0 ? (
+									<TableRow>
+										<TableCell colSpan={6} className="text-center py-8 text-foreground/60">
+											No se encontraron productos
+										</TableCell>
+									</TableRow>
+								) : (
+									items.map((p: any) => {
+										const idProd = p.id_product ?? p.id
+										const prodName = p.name || p.description || p.nombre || 'Sin nombre'
+										const prodType = p.productType?.name ?? p.typeName ?? '-'
+										const prodPrice = typeof p.price !== 'undefined' ? `$ ${Number(p.price).toFixed(2)}` : '-'
+										const prodStock = p.stock ?? p.quantity ?? 0
+										const isActive = p.is_active
+
+										return (
+											<TableRow key={idProd} className="hover:bg-primary/5">
+												<TableCell>
+													<div className="font-medium">{prodName}</div>
+													{p.sku && <div className="text-xs text-foreground/60">SKU: {p.sku}</div>}
+												</TableCell>
+												<TableCell>{prodType}</TableCell>
+												<TableCell className="text-right font-medium">{prodPrice}</TableCell>
+												<TableCell className="text-right">
+													<Badge variant={prodStock > 0 ? 'default' : 'destructive'}>
+														{prodStock} unid.
+													</Badge>
+												</TableCell>
+												<TableCell className="text-center">
+													<Badge variant={isActive ? 'default' : 'secondary'}>
+														{isActive ? <CheckCircle2 className="w-3 h-3 mr-1 inline" /> : <XCircle className="w-3 h-3 mr-1 inline" />}
+														{isActive ? 'Activo' : 'Inactivo'}
+													</Badge>
+												</TableCell>
+												<TableCell className="text-center">
+													{isAdmin ? (
+														<div className="flex items-center justify-center gap-2">
+															<Button size="sm" variant="outline" onClick={() => openEdit(p)} title="Editar">
+																<Edit2 className="w-4 h-4" />
+															</Button>
+															<Button size="sm" variant={isActive ? 'default' : 'secondary'} onClick={() => toggleActive(p)} title={isActive ? 'Desactivar' : 'Activar'}>
+																{isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+															</Button>
+															<Button size="sm" variant="destructive" onClick={() => onDelete(idProd)} title="Eliminar">
+																<Trash2 className="w-4 h-4" />
+															</Button>
+														</div>
+													) : (
+														<span className="text-xs text-foreground/60">-</span>
+													)}
+												</TableCell>
+											</TableRow>
+										)
+									})
+								)}
+							</TableBody>
+						</Table>
+					</div>
+
+					<div className="mt-6 flex items-center justify-between">
+						<div className="text-sm text-foreground/60">
+							Total: <span className="font-medium">{total}</span> productos
+						</div>
+						<div className="flex items-center gap-3">
+							<Button size="sm" variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+								Anterior
+							</Button>
+							<div className="text-sm font-medium px-3 py-1 rounded-md bg-primary/10">
+								{page} / {pages}
+							</div>
+							<Button size="sm" variant="outline" onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}>
+								Siguiente
+							</Button>
+							<Select value={String(limit)} onValueChange={val => { setLimit(Number(val)); setPage(1) }}>
+								<SelectTrigger className="w-20">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="5">5</SelectItem>
+									<SelectItem value="10">10</SelectItem>
+									<SelectItem value="20">20</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
+			<Dialog open={showForm} onOpenChange={setShowForm}>
+				<DialogContent className="sm:max-w-lg">
+					<DialogHeader>
+						<DialogTitle>{editing ? 'Editar producto' : 'Crear producto'}</DialogTitle>
+						<DialogDescription>
+							{editing ? 'Actualiza los datos del producto.' : 'Ingresa los datos del nuevo producto.'}
+						</DialogDescription>
+					</DialogHeader>
+					<ProductForm initial={editing} onCancel={() => setShowForm(false)} onSave={submitForm} />
+				</DialogContent>
+			</Dialog>
+		</div>
+	)
 }
 
-const ProductForm: React.FC<{ initial?: any | null; onCancel: () => void; onSave: (payload: any) => void }> = ({ initial, onCancel, onSave }) => {
-  const [name, setName] = useState(initial?.name ?? '')
-  const [price, setPrice] = useState(initial?.price ?? '')
-  const [stock, setStock] = useState(initial?.stock ?? '')
-  const [typeId, setTypeId] = useState(initial?.id_type ?? initial?.idType ?? '')
-  const [types, setTypes] = useState<any[]>([])
-  const [typesLoading, setTypesLoading] = useState(false)
+interface ProductFormProps {
+	initial?: any | null
+	onCancel: () => void
+	onSave: (payload: any) => void
+}
 
-  useEffect(() => {
-    // Load product types
-    setTypesLoading(true)
-    productTypesApi.list()
-      .then(d => {
-        console.log('[ProductForm] Types loaded from API:', d)
-        if (Array.isArray(d)) setTypes(d)
-        else if (d?.data && Array.isArray(d.data)) setTypes(d.data)
-        else setTypes([])
-      })
-      .catch(err => {
-        console.error('[ProductForm] Error loading types:', err)
-        setTypes([])
-      })
-      .finally(() => setTypesLoading(false))
-  }, [])
+const ProductForm: React.FC<ProductFormProps> = ({ initial, onCancel, onSave }) => {
+	const [name, setName] = useState(initial?.name ?? '')
+	const [price, setPrice] = useState(initial?.price ?? '')
+	const [stock, setStock] = useState(initial?.stock ?? '')
+	const [typeId, setTypeId] = useState(String(initial?.id_type ?? initial?.idType ?? ''))
+	const [types, setTypes] = useState<any[]>([])
+	const [typesLoading, setTypesLoading] = useState(false)
+	const [formLoading, setFormLoading] = useState(false)
 
-  const submit = (e?: React.FormEvent) => {
-    e?.preventDefault()
-    const payload: any = { 
-      name, 
-      price: Number(price || 0), 
-      stock: Number(stock || 0),
-    }
-    // FIX: Send idType as camelCase number, not id_type
-    if (typeId) {
-      payload.idType = Number(typeId)
-      console.log('[ProductForm] TypeId value:', typeId, 'converted to idType:', payload.idType)
-    }
-    console.log('[ProductForm] Final payload before submit:', JSON.stringify(payload, null, 2))
-    onSave(payload)
-  }
+	useEffect(() => {
+		setTypesLoading(true)
+		productTypesApi.list()
+			.then(d => {
+				if (Array.isArray(d)) setTypes(d)
+				else if (d?.data && Array.isArray(d.data)) setTypes(d.data)
+				else setTypes([])
+			})
+			.catch(err => {
+				showError('Error', 'No se pudieron cargar los tipos de producto')
+				console.error(err)
+			})
+			.finally(() => setTypesLoading(false))
+	}, [])
 
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Nombre</label>
-        <input 
-          value={name} 
-          onChange={e => setName(e.target.value)} 
-          required
-          className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300" 
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Precio</label>
-          <input 
-            type="number" 
-            step="0.01"
-            value={price} 
-            onChange={e => setPrice(e.target.value)} 
-            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300" 
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Stock</label>
-          <input 
-            type="number" 
-            value={stock} 
-            onChange={e => setStock(e.target.value)} 
-            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300" 
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Tipo de Producto</label>
-        <select 
-          value={typeId} 
-          onChange={e => {
-            console.log('[ProductForm] Type selected:', e.target.value)
-            setTypeId(e.target.value)
-          }}
-          disabled={typesLoading}
-          className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:bg-gray-100"
-        >
-          <option value="">-- Selecciona un tipo --</option>
-          {types.map((t: any) => (
-            <option key={t.id_type ?? t.id} value={t.id_type ?? t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
+	const submit = async (e: React.FormEvent) => {
+		e.preventDefault()
 
-      <div className="flex items-center justify-end gap-2 pt-4">
-        <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-        <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700">Guardar</button>
-      </div>
-    </form>
-  )
+		if (!name.trim()) {
+			showError('Campo requerido', 'Por favor ingresa el nombre del producto')
+			return
+		}
+
+		const numPrice = Number(price || 0)
+		if (isNaN(numPrice) || numPrice < 0) {
+			showError('Precio inválido', 'El precio debe ser un número positivo')
+			return
+		}
+
+		const numStock = Number(stock || 0)
+		if (isNaN(numStock) || numStock < 0) {
+			showError('Stock inválido', 'El stock debe ser un número no negativo')
+			return
+		}
+
+		if (!typeId) {
+			showError('Campo requerido', 'Por favor selecciona un tipo de producto')
+			return
+		}
+
+		const payload = {
+			name: name.trim(),
+			price: numPrice,
+			stock: numStock,
+			idType: Number(typeId)
+		}
+
+		setFormLoading(true)
+		try {
+			await onSave(payload)
+		} finally {
+			setFormLoading(false)
+		}
+	}
+
+	return (
+		<form onSubmit={submit} className="space-y-4">
+			<div className="space-y-2">
+				<Label htmlFor="name">Nombre del producto *</Label>
+				<Input id="name" placeholder="Ej: Amoxicilina 500mg" value={name} onChange={e => setName(e.target.value)} disabled={formLoading} />
+			</div>
+
+			<div className="grid grid-cols-2 gap-4">
+				<div className="space-y-2">
+					<Label htmlFor="price">Precio ($) *</Label>
+					<Input id="price" type="number" step="0.01" placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} disabled={formLoading} />
+				</div>
+				<div className="space-y-2">
+					<Label htmlFor="stock">Stock (unidades) *</Label>
+					<Input id="stock" type="number" step="1" placeholder="0" value={stock} onChange={e => setStock(e.target.value)} disabled={formLoading} />
+				</div>
+			</div>
+
+			<div className="space-y-2">
+				<Label htmlFor="type">Tipo de Producto *</Label>
+				{typesLoading ? (
+					<div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-foreground/5">
+						<Loader2 className="w-4 h-4 animate-spin" />
+						<span className="text-sm">Cargando tipos...</span>
+					</div>
+				) : (
+					<Select value={typeId} onValueChange={setTypeId} disabled={formLoading}>
+						<SelectTrigger id="type">
+							<SelectValue placeholder="Selecciona un tipo" />
+						</SelectTrigger>
+						<SelectContent>
+							{types.length === 0 ? (
+								<div className="p-2 text-sm text-foreground/60">No hay tipos disponibles</div>
+							) : (
+								types.map((t: any) => {
+									const typeIdVal = t.id_type ?? t.id
+									return (
+										<SelectItem key={typeIdVal} value={String(typeIdVal)}>
+											{t.name}
+										</SelectItem>
+									)
+								})
+							)}
+						</SelectContent>
+					</Select>
+				)}
+			</div>
+
+			<DialogFooter className="pt-4">
+				<Button type="button" variant="outline" onClick={onCancel} disabled={formLoading}>
+					Cancelar
+				</Button>
+				<Button type="submit" disabled={formLoading} className="gap-2">
+					{formLoading ? (
+						<>
+							<Loader2 className="w-4 h-4 animate-spin" />
+							Guardando...
+						</>
+					) : (
+						'Guardar'
+					)}
+				</Button>
+			</DialogFooter>
+		</form>
+	)
 }
 
 export default ProductList
+

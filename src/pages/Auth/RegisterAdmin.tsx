@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext'
 import { register } from '../../services/api/auth'
 import { RolesEnum } from '../../constants/roles'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { showError, showLoading, closeLoading, showSuccess } from '../../lib/sweet-alert'
 
 const RegisterAdmin: React.FC = () => {
   const { user } = useContext(AuthContext)
@@ -23,47 +27,65 @@ const RegisterAdmin: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr(null)
+    if (!name.trim() || !email.trim() || !username.trim() || !password.trim()) {
+      showError('Campos requeridos', 'Completa todos los campos obligatorios')
+      return
+    }
+    if (password.trim().length < 4) {
+      showError('Contraseña inválida', 'Debe tener al menos 4 caracteres')
+      return
+    }
     try {
-      await register({ idRole: role, name, email, username, password })
-      alert('Usuario creado')
+      showLoading()
+      await register({ idRole: role, name: name.trim(), email: email.trim(), username: username.trim(), password: password.trim() })
+      closeLoading()
+      showSuccess('Usuario creado')
       navigate('/')
     } catch (error: any) {
-      setErr(error?.response?.data?.message || 'Error')
+      closeLoading()
+      const msg = error?.response?.data?.message || 'Error creando usuario'
+      setErr(msg)
+      showError('Error', msg)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-sky-50">
-      <div className="w-full max-w-md bg-white shadow rounded p-6">
-        <h2 className="text-2xl font-semibold text-sky-800 mb-4">Crear personal — Admin</h2>
-        <form onSubmit={submit} className="space-y-4">
-          {err && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{err}</div>}
-          <div>
-            <label className="block text-sm text-gray-700">Nombre</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full border rounded px-3 py-2 mt-1" required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full border rounded px-3 py-2 mt-1" required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700">Usuario</label>
-            <input value={username} onChange={e => setUsername(e.target.value)} className="w-full border rounded px-3 py-2 mt-1" required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700">Contraseña</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border rounded px-3 py-2 mt-1" required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700">Rol</label>
-            <select value={role} onChange={e => setRole(Number(e.target.value))} className="w-full border rounded px-3 py-2 mt-1">
-              <option value={RolesEnum.STAFF}>Staff</option>
-              <option value={RolesEnum.ADMIN}>Admin</option>
-            </select>
-          </div>
-          <button className="w-full bg-sky-800 hover:bg-sky-900 text-white py-2 rounded">Crear</button>
-        </form>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-muted px-4 animate-fade-in">
+      <Card className="w-full max-w-md shadow-soft-card animate-scale-in border border-border/60">
+        <CardHeader>
+          <CardTitle className="text-primary">Crear personal — Admin</CardTitle>
+          <CardDescription>Registra nuevo usuario del sistema</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="space-y-5">
+            {err && <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-md" role="alert">{err}</div>}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Nombre *</label>
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre completo" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Email *</label>
+              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@correo.com" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Usuario *</label>
+              <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="usuario" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Contraseña *</label>
+              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Rol *</label>
+              <select value={role} onChange={e => setRole(Number(e.target.value))} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value={RolesEnum.STAFF}>Staff</option>
+                <option value={RolesEnum.ADMIN}>Admin</option>
+              </select>
+            </div>
+            <Button type="submit" className="w-full bg-primary hover:bg-secondary transition-colors">Crear</Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -2,6 +2,26 @@ import React, { useEffect, useState, useContext } from 'react'
 import { salesApi } from '../../services/api/sales'
 import { inventoryApi } from '../../services/api/inventory'
 import { AuthContext } from '../../context/AuthContext'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../../components/ui/dialog'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Card } from '../../components/ui/card'
+import { Badge } from '../../components/ui/badge'
+import { Eye } from 'lucide-react'
 
 const SalesHistory: React.FC = () => {
   const [items, setItems] = useState<any[]>([])
@@ -10,7 +30,7 @@ const SalesHistory: React.FC = () => {
   const [selectedSale, setSelectedSale] = useState<any | null>(null)
   const [saleOutputs, setSaleOutputs] = useState<any[]>([])
   const [detailsLoading, setDetailsLoading] = useState(false)
-  const { user } = useContext(AuthContext)
+  const { } = useContext(AuthContext)
 
   const fetch = async (date?: string | null) => {
     setLoading(true)
@@ -69,78 +89,172 @@ const SalesHistory: React.FC = () => {
     }
   }
 
+  const formatCurrency = (value: number | string) => {
+    return `$${Number(value).toFixed(2)}`
+  }
+
+  const formatDate = (date: any) => {
+    return new Date(date).toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-semibold">Historial de ventas</h2>
-        <div className="flex items-center gap-3">
-          <input type="date" value={filterDate ?? ''} onChange={e => setFilterDate(e.target.value || null)} className="px-2 py-1 border rounded" />
-          <button onClick={applyDateFilter} className="px-3 py-1 bg-sky-600 text-white rounded text-sm">Filtrar</button>
-          <div className="text-sm text-gray-600">{user?.username || ''}</div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Historial de ventas</h1>
+          <p className="text-muted-foreground mt-1">Consulta todas tus ventas registradas</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={filterDate ?? ''}
+            onChange={e => setFilterDate(e.target.value || null)}
+            className="max-w-xs"
+          />
+          <Button onClick={applyDateFilter}>Filtrar</Button>
         </div>
       </div>
 
-      {loading ? <div>Cargando...</div> : (
-        <div className="bg-white shadow rounded p-4">
-          {items.length === 0 ? <div className="text-sm text-gray-500">No hay ventas</div> : (
-            <ul className="space-y-2">
-              {items.map(s => (
-                <li key={s.id ?? s.id_sale ?? s.created_at} className="border p-3 rounded">
-                  <div className="flex justify-between">
-                    <div>
-                      <div className="font-medium">Venta #{s.id ?? s.id_sale}</div>
-                      <div className="text-xs text-gray-500">Usuario: {s.userName || s.user?.name || s.staffName || '-'}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold">${Number(s.total ?? s.amount ?? 0).toFixed(2)}</div>
-                      <div className="text-xs text-gray-400">{new Date(s.createdAt || s.created_at || Date.now()).toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button onClick={() => viewDetails(s)} className="px-2 py-1 bg-sky-600 text-white rounded text-sm">Ver detalles</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {selectedSale && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-11/12 max-w-md p-6 shadow-lg">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">Venta #{selectedSale.id ?? selectedSale.id_sale}</h3>
-                <div className="text-xs text-gray-500">{new Date(selectedSale.createdAt || selectedSale.created_at || Date.now()).toLocaleString()}</div>
-              </div>
-              <button onClick={() => setSelectedSale(null)} className="text-sm text-gray-600 hover:text-gray-800">✕</button>
+      <Card>
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
             </div>
-
-            {detailsLoading ? <div className="text-center py-4">Cargando medicamentos...</div> : (
-              <div className="border rounded p-3">
-                {saleOutputs.length === 0 ? (
-                  <div className="text-sm text-gray-500">No hay medicamentos registrados</div>
-                ) : (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Medicamentos:</h4>
-                    {saleOutputs.map((o, idx) => (
-                      <div key={o.id_output ?? idx} className="flex justify-between items-center py-2 border-b last:border-b-0">
-                        <span className="text-sm font-semibold text-black">{o.product_name ?? o.productName ?? o.id_product ?? 'Producto'}</span>
-                        <span className="text-sm font-semibold">Cantidad: {o.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end">
-              <button onClick={() => setSelectedSale(null)} className="px-4 py-2 bg-sky-600 text-white rounded text-sm hover:bg-sky-700">Cerrar</button>
-            </div>
+            <p className="mt-4 text-muted-foreground">Cargando ventas...</p>
           </div>
-        </div>
-      )}
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>#Venta</TableHead>
+                <TableHead>Usuario</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Acción</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No hay ventas registradas
+                  </TableCell>
+                </TableRow>
+              ) : (
+                items.map(s => (
+                  <TableRow key={s.id ?? s.id_sale ?? s.created_at}>
+                    <TableCell className="font-semibold">#{s.id ?? s.id_sale}</TableCell>
+                    <TableCell>{s.userName || s.user?.name || s.staffName || '-'}</TableCell>
+                    <TableCell className="text-sm">{formatDate(s.createdAt || s.created_at)}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(s.total ?? s.amount ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => viewDetails(s)}
+                        className="gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Ver detalles
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      {/* Details Dialog */}
+      <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              Venta #{selectedSale?.id ?? selectedSale?.id_sale}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {formatDate(selectedSale?.createdAt || selectedSale?.created_at)}
+            </p>
+          </DialogHeader>
+
+          {detailsLoading ? (
+            <div className="py-8 text-center">
+              <div className="inline-block animate-spin">
+                <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full" />
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">Cargando detalles...</p>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div>
+                <h4 className="text-sm font-semibold mb-3">Productos:</h4>
+                <div className="border rounded-lg">
+                  {saleOutputs.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center">
+                      No hay productos en esta venta
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {saleOutputs.map((o, idx) => (
+                        <div
+                          key={o.id_output ?? idx}
+                          className="p-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">
+                              {o.product_name ?? o.productName ?? 'Producto'}
+                            </p>
+                            {o.laboratory_name && (
+                              <p className="text-xs text-muted-foreground">
+                                Lab: {o.laboratory_name}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="secondary">
+                              Qty: {o.quantity}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedSale && (
+                <div className="bg-muted p-3 rounded-lg">
+                  <div className="flex justify-between text-sm">
+                    <span>Total:</span>
+                    <span className="font-semibold">
+                      {formatCurrency(selectedSale.total ?? selectedSale.amount ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedSale(null)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

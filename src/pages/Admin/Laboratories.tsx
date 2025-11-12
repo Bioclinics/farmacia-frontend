@@ -1,5 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import { laboratoriesApi } from '../../services/api/laboratories'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../../components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Card } from '../../components/ui/card'
+import { confirmDelete, showError, showToast, showSuccess } from '../../lib/sweet-alert'
+import { Trash2, Edit2, Plus } from 'lucide-react'
 
 const Laboratories: React.FC = () => {
   const [items, setItems] = useState<any[]>([])
@@ -17,6 +37,7 @@ const Laboratories: React.FC = () => {
     } catch (err) {
       console.error(err)
       setItems([])
+      showError('Error', 'No se pudieron cargar los laboratorios')
     } finally {
       setLoading(false)
     }
@@ -37,84 +58,142 @@ const Laboratories: React.FC = () => {
   }
 
   const submit = async () => {
-    if (!name.trim()) return alert('El nombre es obligatorio')
+    if (!name.trim()) {
+      showError('Campo requerido', 'El nombre es obligatorio')
+      return
+    }
     try {
       if (editing) {
         const itemId = editing.id_laboratory || editing.id
         await laboratoriesApi.update(itemId, { name })
+        showSuccess('Laboratorio actualizado')
       } else {
         await laboratoriesApi.create({ name })
+        showSuccess('Laboratorio creado')
       }
       setShowForm(false)
       fetch()
     } catch (err: any) {
-      alert(err?.message || 'Error guardando')
+      showError('Error', err?.message || 'Error guardando laboratorio')
     }
   }
 
   const onDelete = async (item: any) => {
-    if (!confirm('¿Eliminar laboratorio?')) return
+    const result = await confirmDelete('¿Eliminar laboratorio?')
+    if (!result.isConfirmed) return
+
     try {
       const itemId = item.id_laboratory || item.id
       await laboratoriesApi.remove(itemId)
+      showSuccess('Laboratorio eliminado')
       fetch()
     } catch (err: any) {
-      alert(err?.message || 'Error eliminando')
+      showError('Error', err?.message || 'Error eliminando laboratorio')
     }
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold">Laboratorios</h2>
-        <button onClick={openNew} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded">Nuevo laboratorio</button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Laboratorios</h1>
+          <p className="text-muted-foreground mt-1">Administra los laboratorios disponibles</p>
+        </div>
+        <Button onClick={openNew} size="lg" className="gap-2">
+          <Plus className="w-4 h-4" />
+          Nuevo laboratorio
+        </Button>
       </div>
 
-      {loading ? <div>Cargando...</div> : (
-        <div className="bg-white rounded-lg shadow overflow-auto">
-          <table className="w-full">
-            <thead className="bg-sky-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm text-gray-600">Nombre</th>
-                <th className="px-4 py-3 text-center text-sm text-gray-600">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
+      <Card>
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+            <p className="mt-4 text-muted-foreground">Cargando...</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {items.length === 0 ? (
-                <tr><td colSpan={2} className="p-6 text-center text-gray-500">No hay laboratorios</td></tr>
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+                    No hay laboratorios
+                  </TableCell>
+                </TableRow>
               ) : (
                 items.map((item: any) => (
-                  <tr key={item.id_laboratory || item.id} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3">{item.name}</td>
-                    <td className="px-4 py-3 text-center space-x-2">
-                      <button onClick={() => openEdit(item)} className="text-sky-600 hover:text-sky-800 text-sm">Editar</button>
-                      <button onClick={() => onDelete(item)} className="text-red-600 hover:text-red-800 text-sm">Eliminar</button>
-                    </td>
-                  </tr>
+                  <TableRow key={item.id_laboratory || item.id}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEdit(item)}
+                          className="gap-2"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Editar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onDelete(item)}
+                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Eliminar
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md p-6 shadow-lg">
-            <h3 className="text-lg font-semibold mb-4">{editing ? 'Editar laboratorio' : 'Nuevo laboratorio'}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-gray-600">Nombre</label>
-                <input value={name} onChange={e => setName(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded" />
-              </div>
-              <div className="flex justify-end gap-2 pt-3">
-                <button onClick={() => setShowForm(false)} className="px-4 py-2 border rounded">Cancelar</button>
-                <button onClick={submit} className="px-4 py-2 bg-sky-600 text-white rounded">Guardar</button>
-              </div>
+      {/* Form Dialog */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? 'Editar laboratorio' : 'Nuevo laboratorio'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre</label>
+              <Input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="ej: Farmacéutica ABC"
+                onKeyPress={(e) => e.key === 'Enter' && submit()}
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowForm(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={submit} className="bg-primary">
+              {editing ? 'Actualizar' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
