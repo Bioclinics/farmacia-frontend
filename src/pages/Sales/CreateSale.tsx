@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AuthContext } from '../../context/AuthContext'
+import { RolesEnum } from '../../constants/roles'
 import { salesApi } from '../../services/api/sales'
 import { productsApi } from '../../services/api/products'
 
@@ -16,10 +19,39 @@ const CreateSale: React.FC = () => {
     }).catch(() => setProducts([]))
   }, [])
 
+  const navigate = useNavigate()
+  const { user } = useContext(AuthContext)
+
+  useEffect(() => {
+    // if not staff or admin, redirect to sales history
+    if (user && user.idRole !== RolesEnum.STAFF && user.idRole !== RolesEnum.ADMIN) {
+      navigate('/ventas')
+    }
+  }, [user])
+
   const addItem = (p: any) => {
     const id = p.id_product ?? p.id
     const price = p.price ?? p.unit_price ?? p.cost ?? 0
-    setItems(prev => [...prev, { productId: id, idProduct: id, id_product: id, quantity: 1, price, unit_price: price }])
+    const stock = Number(p.stock ?? 0)
+    if (stock <= 0) {
+      alert('Producto no disponible (sin stock)')
+      return
+    }
+    setItems(prev => {
+      // if already present, increase quantity but don't exceed stock
+      const existingIndex = prev.findIndex(it => it.id_product === id || it.productId === id)
+      if (existingIndex >= 0) {
+        const newItems = [...prev]
+        const currentQty = Number(newItems[existingIndex].quantity || 0)
+        if (currentQty + 1 > stock) {
+          alert(`No hay suficiente stock. Máximo ${stock} unidades disponibles.`)
+          return prev
+        }
+        newItems[existingIndex].quantity = currentQty + 1
+        return newItems
+      }
+      return [...prev, { productId: id, idProduct: id, id_product: id, quantity: 1, price, unit_price: price }]
+    })
   }
 
   const removeItem = (idx: number) => {
@@ -29,7 +61,20 @@ const CreateSale: React.FC = () => {
   const updateItemQuantity = (idx: number, qty: number) => {
     setItems(prev => {
       const newItems = [...prev]
-      newItems[idx].quantity = Math.max(1, qty)
+      const target = newItems[idx]
+      const prod = products.find(p => (p.id_product ?? p.id) === (target.productId ?? target.idProduct ?? target.id_product))
+      const maxStock = Number(prod?.stock ?? 0)
+      let desired = Number(qty)
+      if (Number.isNaN(desired) || desired < 1) desired = 1
+      if (maxStock <= 0) {
+        alert('Producto no disponible (sin stock)')
+        desired = 1
+      }
+      if (desired > maxStock) {
+        alert(`No hay suficiente stock. Máximo ${maxStock} unidades disponibles.`)
+        desired = maxStock
+      }
+      newItems[idx].quantity = desired
       return newItems
     })
   }
@@ -38,6 +83,13 @@ const CreateSale: React.FC = () => {
     if (items.length === 0) return
     setLoading(true)
     try {
+      // Validate stock before sending
+      for (const it of items) {
+        const prod = products.find(p => (p.id_product ?? p.id) === (it.id_product ?? it.productId ?? it.idProduct))
+        const available = Number(prod?.stock ?? 0)
+        if (available <= 0) throw new Error(`El producto ${prod?.name ?? it.id_product} no está disponible`)
+        if ((it.quantity ?? 0) > available) throw new Error(`Cantidad solicitada para ${prod?.name ?? it.id_product} supera el stock disponible (${available})`)
+      }
       const total = items.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0)
       console.log('[CreateSale] Items array:', items)
       console.log('[CreateSale] Total calculated:', total)
@@ -83,18 +135,22 @@ const CreateSale: React.FC = () => {
         <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow">
           <h3 className="font-medium mb-3">Productos disponibles</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-auto">
-            {products.map((p: any) => (
-              <div key={p.id_product ?? p.id} className="flex items-center justify-between border rounded-md p-3 hover:shadow-md transition">
-                <div>
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-sm text-gray-500">Stock: {p.stock ?? '-'}</div>
+            {products.map((p: any) => {
+              const stock = Number(p.stock ?? 0)
+              const unavailable = stock <= 0
+              return (
+                <div key={p.id_product ?? p.id} className={`flex items-center justify-between border rounded-md p-3 hover:shadow-md transition ${unavailable ? 'bg-red-50/60' : ''}`}>
+                  <div>
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-sm" style={{ color: unavailable ? 'rgba(185, 28, 28, 0.9)' : undefined }}>{unavailable ? 'No disponible' : `Stock: ${p.stock ?? '-'}`}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="text-sky-700 font-semibold">{p.price ? `$ ${Number(p.price).toFixed(2)}` : '-'}</div>
+                    <button disabled={unavailable} className={`text-sm px-3 py-1 rounded ${unavailable ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-sky-600 text-white hover:bg-sky-700'}`} onClick={() => addItem(p)}>{unavailable ? 'Agotado' : 'Agregar'}</button>
+                  </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-sky-700 font-semibold">{p.price ? `$ ${Number(p.price).toFixed(2)}` : '-'}</div>
-                  <button className="text-sm bg-sky-600 text-white px-3 py-1 rounded hover:bg-sky-700" onClick={() => addItem(p)}>Agregar</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

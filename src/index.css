@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+:root {
+	--color-primary: #2e4999;
+	--color-secondary: #3d61cc;
+	--color-tertiary: #1b2a59;
+	--bg-default: #f8fafc; /* light background */
+	--text-default: #0f172a; /* dark text */
+}
+
+/* Apply basic variables to body (single light theme) */
+body {
+	background-color: var(--bg-default);
+	color: var(--text-default);
+}
+
+/* Ensure some commonly used utility classes follow the new palette (fallbacks) */
+.text-sky-700 { color: var(--color-primary) !important; }
+.bg-sky-600 { background-color: var(--color-secondary) !important; }
+.bg-sky-700 { background-color: var(--color-primary) !important; }
+.bg-sky-800 { background-color: var(--color-tertiary) !important; }
+.text-sky-600 { color: var(--color-secondary) !important; }
+.text-sky-800 { color: var(--color-tertiary) !important; }
+.bg-sky-50 { background-color: #f1f5ff !important; }

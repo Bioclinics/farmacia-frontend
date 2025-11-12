@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useContext } from 'react'
+import { AuthContext } from '../../context/AuthContext'
 import { productsApi, productTypesApi } from '../../services/api/products'
 
 const ProductList: React.FC = () => {
@@ -11,6 +12,8 @@ const ProductList: React.FC = () => {
   const [pages, setPages] = useState(1)
   const [editing, setEditing] = useState<any | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const { user } = useContext(AuthContext)
+  const isAdmin = user?.idRole === 2
 
   const fetch = async (q = query, p = page, l = limit) => {
     setLoading(true)
@@ -149,7 +152,9 @@ const ProductList: React.FC = () => {
             placeholder="Buscar por nombre..."
             className="px-3 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
           />
-          <button onClick={openNew} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg shadow">Nuevo producto</button>
+          {isAdmin && (
+            <button onClick={openNew} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg shadow">Nuevo producto</button>
+          )}
         </div>
       </div>
 
@@ -191,9 +196,15 @@ const ProductList: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => openEdit(p)} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded">Editar</button>
-                      <button onClick={() => toggleActive(p)} className="px-2 py-1 text-xs border border-sky-300 text-sky-600 hover:bg-sky-50 rounded">{p.is_active ? 'Desactivar' : 'Activar'}</button>
-                      <button onClick={() => onDelete(p.id_product ?? p.id)} className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded">Eliminar</button>
+                      {isAdmin ? (
+                        <>
+                          <button onClick={() => openEdit(p)} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded">Editar</button>
+                          <button onClick={() => toggleActive(p)} className="px-2 py-1 text-xs border border-sky-300 text-sky-600 hover:bg-sky-50 rounded">{p.is_active ? 'Desactivar' : 'Activar'}</button>
+                          <button onClick={() => onDelete(p.id_product ?? p.id)} className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded">Eliminar</button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500">Sin acciones</span>
+                      )}
                     </div>
                   </td>
                 </tr>
