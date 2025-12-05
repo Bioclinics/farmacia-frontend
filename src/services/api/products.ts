@@ -16,3 +16,11 @@ export const productTypesApi = {
   remove: (id: string | number) => client.delete(`/product-types/${id}`).then(r => r.data),
 }
 
+export const brandsApi = {
+  list: (params?: any) => client.get('/brands', { params }).then(r => r.data),
+  get: (id: string | number) => client.get(`/brands/${id}`).then(r => r.data),
+  create: (payload: any) => client.post('/brands', payload).then(r => r.data),
+  update: (id: string | number, payload: any) => client.put(`/brands/${id}`, payload).then(r => r.data),
+  remove: (id: string | number) => client.delete(`/brands/${id}`).then(r => r.data),
+}
+

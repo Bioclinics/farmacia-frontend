@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { AuthContext } from '../../context/AuthContext'
-import { productsApi, productTypesApi } from '../../services/api/products'
+import { productsApi, productTypesApi, brandsApi } from '../../services/api/products'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -16,6 +16,12 @@ const ProductList: React.FC = () => {
 	const [items, setItems] = useState<any[]>([])
 	const [loading, setLoading] = useState(false)
 	const [query, setQuery] = useState('')
+	const [selectedType, setSelectedType] = useState<string>('all')
+	const [selectedBrand, setSelectedBrand] = useState<string>('all')
+	const [typesOptions, setTypesOptions] = useState<any[]>([])
+	const [brandsOptions, setBrandsOptions] = useState<any[]>([])
+	const [typesLoading, setTypesLoading] = useState(false)
+	const [brandsLoading, setBrandsLoading] = useState(false)
 	const [page, setPage] = useState(1)
 	const [limit, setLimit] = useState(10)
 	const [total, setTotal] = useState(0)
@@ -28,7 +34,10 @@ const ProductList: React.FC = () => {
 	const fetchProducts = async (pageNum: number, limitNum: number, queryStr: string) => {
 		try {
 			setLoading(true)
-			const params = { q: queryStr, page: pageNum, limit: limitNum }
+			const params: any = { page: pageNum, limit: limitNum }
+			if (queryStr) params.name = queryStr
+			if (selectedType && selectedType !== 'all') params.type = Number(selectedType)
+			if (selectedBrand && selectedBrand !== 'all') params.brand = Number(selectedBrand)
 			const data = await productsApi.list(params)
 
 			const itemsData = data?.data || data?.items || data || []
@@ -59,7 +68,30 @@ const ProductList: React.FC = () => {
 		}, 450)
 		return () => clearTimeout(timer)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [query])
+	}, [query, selectedType, selectedBrand])
+
+	// load filter options
+	useEffect(() => {
+		setTypesLoading(true)
+		productTypesApi.list()
+			.then(d => {
+				if (Array.isArray(d)) setTypesOptions(d)
+				else if (d?.data && Array.isArray(d.data)) setTypesOptions(d.data)
+				else setTypesOptions([])
+			})
+			.catch(err => console.error('[types] ', err))
+			.finally(() => setTypesLoading(false))
+
+		setBrandsLoading(true)
+		brandsApi.list()
+			.then(d => {
+				if (Array.isArray(d)) setBrandsOptions(d)
+				else if (d?.data && Array.isArray(d.data)) setBrandsOptions(d.data)
+				else setBrandsOptions([])
+			})
+			.catch(err => console.error('[brands] ', err))
+			.finally(() => setBrandsLoading(false))
+	}, [])
 
 	useEffect(() => {
 		fetchProducts(page, limit, query)
@@ -164,14 +196,54 @@ const ProductList: React.FC = () => {
 					</div>
 				</CardHeader>
 				<CardContent>
-					<div className="flex items-center gap-2">
-						<Search className="w-4 h-4 text-foreground/60" />
-						<Input
-							placeholder="Buscar por nombre, SKU..."
-							value={query}
-							onChange={e => setQuery(e.target.value)}
-							className="max-w-sm"
-						/>
+					<div className="flex items-center gap-4 flex-wrap">
+						<div className="flex items-center gap-2">
+							<Search className="w-4 h-4 text-foreground/60" />
+							<Input
+								placeholder="Buscar por nombre, SKU..."
+								value={query}
+								onChange={e => setQuery(e.target.value)}
+								className="max-w-sm"
+							/>
+						</div>
+
+						{/* Type filter */}
+						<div>
+							<Select value={selectedType} onValueChange={val => { setSelectedType(val); setPage(1) }}>
+								<SelectTrigger className="w-44">
+									<SelectValue placeholder="Filtrar por tipo" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">Todos</SelectItem>
+									{typesLoading ? (
+										<SelectItem value="loading">Cargando...</SelectItem>
+									) : (
+										typesOptions.map(t => (
+											<SelectItem key={t.id_type ?? t.id} value={String(t.id_type ?? t.id)}>{t.name}</SelectItem>
+										))
+									)}
+								</SelectContent>
+							</Select>
+						</div>
+
+						{/* Brand filter */}
+						<div>
+							<Select value={selectedBrand} onValueChange={val => { setSelectedBrand(val); setPage(1) }}>
+								<SelectTrigger className="w-44">
+									<SelectValue placeholder="Filtrar por marca" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">Todas</SelectItem>
+									{brandsLoading ? (
+										<SelectItem value="loading">Cargando...</SelectItem>
+									) : (
+										brandsOptions.map(b => (
+											<SelectItem key={b.id_brand ?? b.id} value={String(b.id_brand ?? b.id)}>{b.name}</SelectItem>
+										))
+									)}
+								</SelectContent>
+							</Select>
+						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -187,6 +259,7 @@ const ProductList: React.FC = () => {
 								<TableRow className="bg-primary/5">
 									<TableHead>Nombre</TableHead>
 									<TableHead>Tipo</TableHead>
+									<TableHead>Marca</TableHead>
 									<TableHead className="text-right">Precio</TableHead>
 									<TableHead className="text-right">Stock</TableHead>
 									<TableHead className="text-center">Estado</TableHead>
@@ -196,7 +269,7 @@ const ProductList: React.FC = () => {
 							<TableBody>
 								{loading ? (
 									<TableRow>
-										<TableCell colSpan={6} className="text-center py-8">
+										<TableCell colSpan={7} className="text-center py-8">
 											<div className="flex items-center justify-center gap-2">
 												<Loader2 className="w-4 h-4 animate-spin" />
 												<span>Cargando productos...</span>
@@ -205,7 +278,7 @@ const ProductList: React.FC = () => {
 									</TableRow>
 								) : items.length === 0 ? (
 									<TableRow>
-										<TableCell colSpan={6} className="text-center py-8 text-foreground/60">
+										<TableCell colSpan={7} className="text-center py-8 text-foreground/60">
 											No se encontraron productos
 										</TableCell>
 									</TableRow>
@@ -214,7 +287,8 @@ const ProductList: React.FC = () => {
 										const idProd = p.id_product ?? p.id
 										const prodName = p.name || p.description || p.nombre || 'Sin nombre'
 										const prodType = p.productType?.name ?? p.typeName ?? '-'
-										const prodPrice = typeof p.price !== 'undefined' ? `$ ${Number(p.price).toFixed(2)}` : '-'
+										const brandName = p.brand?.name ?? p.brandName ?? '-'
+										const prodPrice = typeof p.price !== 'undefined' ? `Bs ${Number(p.price).toFixed(2)}` : '-'
 										const prodStock = p.stock ?? p.quantity ?? 0
 										const isActive = p.is_active
 
@@ -225,6 +299,7 @@ const ProductList: React.FC = () => {
 													{p.sku && <div className="text-xs text-foreground/60">SKU: {p.sku}</div>}
 												</TableCell>
 												<TableCell>{prodType}</TableCell>
+												<TableCell>{brandName}</TableCell>
 												<TableCell className="text-right font-medium">{prodPrice}</TableCell>
 												<TableCell className="text-right">
 													<Badge variant={prodStock > 0 ? 'default' : 'destructive'}>
@@ -317,8 +392,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onCancel, onSave }) 
 	const [price, setPrice] = useState(initial?.price ?? '')
 	const [stock, setStock] = useState(initial?.stock ?? '')
 	const [typeId, setTypeId] = useState(String(initial?.id_type ?? initial?.idType ?? ''))
+	const [brandId, setBrandId] = useState(String(initial?.id_brand ?? initial?.idBrand ?? initial?.brand?.id_brand ?? ''))
 	const [types, setTypes] = useState<any[]>([])
 	const [typesLoading, setTypesLoading] = useState(false)
+	const [brands, setBrands] = useState<any[]>([])
+	const [brandsLoading, setBrandsLoading] = useState(false)
 	const [formLoading, setFormLoading] = useState(false)
 
 	useEffect(() => {
@@ -334,6 +412,19 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onCancel, onSave }) 
 				console.error(err)
 			})
 			.finally(() => setTypesLoading(false))
+
+		setBrandsLoading(true)
+		brandsApi.list()
+			.then(d => {
+				if (Array.isArray(d)) setBrands(d)
+				else if (d?.data && Array.isArray(d.data)) setBrands(d.data)
+				else setBrands([])
+			})
+			.catch(err => {
+				showError('Error', 'No se pudieron cargar las marcas')
+				console.error(err)
+			})
+			.finally(() => setBrandsLoading(false))
 	}, [])
 
 	const submit = async (e: React.FormEvent) => {
@@ -361,11 +452,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onCancel, onSave }) 
 			return
 		}
 
+		if (!brandId) {
+			showError('Campo requerido', 'Por favor selecciona una marca')
+			return
+		}
+
 		const payload = {
 			name: name.trim(),
 			price: numPrice,
 			stock: numStock,
-			idType: Number(typeId)
+			idType: Number(typeId),
+			idBrand: Number(brandId)
 		}
 
 		setFormLoading(true)
@@ -385,7 +482,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onCancel, onSave }) 
 
 			<div className="grid grid-cols-2 gap-4">
 				<div className="space-y-2">
-					<Label htmlFor="price">Precio ($) *</Label>
+					<Label htmlFor="price">Precio (Bs) *</Label>
 					<Input id="price" type="number" step="0.01" placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} disabled={formLoading} />
 				</div>
 				<div className="space-y-2">
@@ -415,6 +512,36 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onCancel, onSave }) 
 									return (
 										<SelectItem key={typeIdVal} value={String(typeIdVal)}>
 											{t.name}
+										</SelectItem>
+									)
+								})
+							)}
+						</SelectContent>
+					</Select>
+				)}
+			</div>
+
+			<div className="space-y-2">
+				<Label htmlFor="brand">Marca *</Label>
+				{brandsLoading ? (
+					<div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-foreground/5">
+						<Loader2 className="w-4 h-4 animate-spin" />
+						<span className="text-sm">Cargando marcas...</span>
+					</div>
+				) : (
+					<Select value={brandId} onValueChange={setBrandId} disabled={formLoading || brands.length === 0}>
+						<SelectTrigger id="brand">
+							<SelectValue placeholder="Selecciona una marca" />
+						</SelectTrigger>
+						<SelectContent>
+							{brands.length === 0 ? (
+								<div className="p-2 text-sm text-foreground/60">No hay marcas disponibles</div>
+							) : (
+								brands.map((brand: any) => {
+									const brandValue = brand.id_brand ?? brand.id
+									return (
+										<SelectItem key={brandValue} value={String(brandValue)}>
+											{brand.name}
 										</SelectItem>
 									)
 								})

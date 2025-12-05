@@ -159,7 +159,7 @@ const ProductList: React.FC = () => {
                     <div className="text-xs text-gray-500">{p.sku ? `SKU: ${p.sku}` : ''}</div>
                   </td>
                   <td className="px-4 py-3">{p.productType?.name ?? p.typeName ?? '-'}</td>
-                  <td className="px-4 py-3 text-right">{typeof p.price !== 'undefined' ? `$ ${Number(p.price).toFixed(2)}` : '-'}</td>
+                  <td className="px-4 py-3 text-right">{typeof p.price !== 'undefined' ? `Bs ${Number(p.price).toFixed(2)}` : '-'}</td>
                   <td className="px-4 py-3 text-right">{p.stock ?? p.quantity ?? '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>

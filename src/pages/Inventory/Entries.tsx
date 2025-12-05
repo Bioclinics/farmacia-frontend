@@ -22,6 +22,7 @@ const Entries: React.FC = () => {
   const [productQuery, setProductQuery] = useState<string>('')
   const [selectedProduct, setSelectedProduct] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
+  const [unitsPerBox, setUnitsPerBox] = useState<number>(1)
   const [unitCost, setUnitCost] = useState<number>(0)
   const [reason, setReason] = useState<string>('')
 
@@ -67,15 +68,21 @@ const Entries: React.FC = () => {
       return
     }
 
+    if (!unitsPerBox || unitsPerBox <= 0) {
+      showError('Validación', 'Las unidades por caja deben ser mayores a 0')
+      return
+    }
+
     setFormLoading(true)
     showLoading()
 
     try {
-      const subtotal = Number(unitCost) * Number(quantity)
+      const subtotal = Number(unitCost) * Number(quantity) * Number(unitsPerBox)
       await inventoryApi.createEntry({
         idProduct: Number(selectedProduct),
         idLaboratory: Number(selectedLab),
         quantity,
+        unitsPerBox,
         unitCost,
         subtotal,
         isAdjustment: false,
@@ -86,6 +93,7 @@ const Entries: React.FC = () => {
       setProductQuery('')
       setSelectedProduct('')
       setQuantity(1)
+      setUnitsPerBox(1)
       setUnitCost(0)
       setReason('')
       showSuccess('Entrada registrada con éxito')
@@ -146,6 +154,11 @@ const Entries: React.FC = () => {
                 const product = entry.product?.name ?? entry.productName ?? 'Producto'
                 const lab = entry.laboratory?.name ?? entry.laboratoryName ?? 'Laboratorio'
                 const date = new Date(entry.created_at || entry.createdAt || Date.now())
+                const boxes = Number(entry.quantity ?? 0)
+                const unitsPerBoxValue = Number(entry.unitsPerBox ?? entry.units_per_box ?? 1)
+                const totalUnits = boxes * unitsPerBoxValue
+                const unitCostValue = Number(entry.unitCost ?? entry.unit_cost ?? 0)
+                const subtotalValue = Number(entry.subtotal ?? unitCostValue * totalUnits)
                 return (
                   <div
                     key={entry.id_input ?? entry.id ?? idx}
@@ -163,16 +176,22 @@ const Entries: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <div className="flex items-baseline gap-2">
+                      <div className="text-right space-y-1">
+                        <div className="flex items-center gap-2 justify-end flex-wrap">
                           <Badge className="bg-primary/10 text-primary border-primary/30">
-                            {entry.quantity} unidad{entry.quantity !== 1 ? 'es' : ''}
+                            {boxes} caja{boxes !== 1 ? 's' : ''}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {unitsPerBoxValue} unid/caja
                           </Badge>
                         </div>
-                        <div className="text-sm text-foreground/60 mt-2">
-                          ${(entry.quantity * entry.unitCost).toFixed(2)}
+                        <div className="text-xs text-foreground/60">
+                          {totalUnits} unidades totales
                         </div>
-                        <div className="text-xs text-foreground/50 mt-1">
+                        <div className="text-sm font-semibold text-primary">
+                          Bs {subtotalValue.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-foreground/50">
                           {date.toLocaleDateString()} {date.toLocaleTimeString()}
                         </div>
                       </div>
@@ -214,10 +233,6 @@ const Entries: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Producto */}
-            <div className="space-y-2">
               <Label htmlFor="product-search">Producto</Label>
               <Input
                 id="product-search"
@@ -243,7 +258,17 @@ const Entries: React.FC = () => {
                       }`}
                     >
                       <div className="flex justify-between items-center">
-                        <span>{prod.name}</span>
+                        <div className="flex-1">
+                          <div className="font-medium">{prod.name}</div>
+                          <div className="text-xs text-foreground/60 mt-1 flex items-center gap-2">
+                            {prod.productType?.name && (
+                              <Badge variant="outline" className="text-xs">{prod.productType?.name}</Badge>
+                            )}
+                            {prod.brand?.name && (
+                              <Badge variant="secondary" className="text-xs">{prod.brand?.name}</Badge>
+                            )}
+                          </div>
+                        </div>
                         <Badge variant="outline" className="text-xs">
                           Stock: {prod.stock ?? 0}
                         </Badge>
@@ -257,17 +282,23 @@ const Entries: React.FC = () => {
                   <div className="font-medium text-primary">
                     ✓ {selectedProductData.name}
                   </div>
-                  <div className="text-foreground/60 text-xs mt-1">
-                    Stock actual: {selectedProductData.stock ?? 0}
+                  <div className="text-foreground/60 text-xs mt-1 flex items-center gap-2">
+                    {selectedProductData.productType?.name && (
+                      <Badge variant="outline" className="text-xs">{selectedProductData.productType?.name}</Badge>
+                    )}
+                    {selectedProductData.brand?.name && (
+                      <Badge variant="secondary" className="text-xs">{selectedProductData.brand?.name}</Badge>
+                    )}
+                    <span className="ml-2">Stock actual: {selectedProductData.stock ?? 0}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Cantidad y Costo */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Cantidad, unidades por caja y costo */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="qty">Cantidad</Label>
+                <Label htmlFor="qty">Cantidad de cajas</Label>
                 <Input
                   id="qty"
                   type="number"
@@ -278,7 +309,18 @@ const Entries: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cost">Costo unitario</Label>
+                <Label htmlFor="units">Unidades por caja</Label>
+                <Input
+                  id="units"
+                  type="number"
+                  min={1}
+                  value={unitsPerBox}
+                  onChange={(e) => setUnitsPerBox(Number(e.target.value) || 1)}
+                  disabled={formLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cost">Costo por unidad</Label>
                 <Input
                   id="cost"
                   type="number"
@@ -304,11 +346,14 @@ const Entries: React.FC = () => {
             </div>
 
             {/* Subtotal preview */}
-            {quantity && unitCost && (
+            {quantity && unitCost && unitsPerBox && (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                 <div className="text-sm text-foreground/70">Subtotal estimado</div>
                 <div className="text-xl font-bold text-primary">
-                  ${(quantity * unitCost).toFixed(2)}
+                  Bs {(quantity * unitsPerBox * unitCost).toFixed(2)}
+                </div>
+                <div className="text-xs text-foreground/60 mt-1">
+                  Total unidades: {quantity * unitsPerBox}
                 </div>
               </div>
             )}

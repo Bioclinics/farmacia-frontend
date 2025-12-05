@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect, useContext, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext'
 import { RolesEnum } from '../../constants/roles'
@@ -8,13 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Badge } from '../../components/ui/badge'
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '../../components/ui/select'
 import { showError, showLoading, closeLoading, showSuccess } from '../../lib/sweet-alert'
-import { Plus, Trash2, ShoppingCart, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, ShoppingCart, AlertCircle, Search } from 'lucide-react'
+import { productTypesApi } from '../../services/api/products'
 
 const CreateSale: React.FC = () => {
   const [items, setItems] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
+  const [query, setQuery] = useState<string>('')
+  const [types, setTypes] = useState<any[]>([])
+  const [typeFilter, setTypeFilter] = useState<string>('all')
   const [loading, setLoading] = useState(false)
+  const lastAddRef = useRef<Record<string, number>>({})
+  const [addingIds, setAddingIds] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     productsApi.list().then(d => {
@@ -23,6 +30,12 @@ const CreateSale: React.FC = () => {
       else if (d?.items && Array.isArray(d.items)) setProducts(d.items)
       else setProducts([])
     }).catch(() => setProducts([]))
+    // load product types for filter
+    productTypesApi.list().then(d => {
+      if (Array.isArray(d)) setTypes(d)
+      else if (d?.data && Array.isArray(d.data)) setTypes(d.data)
+      else setTypes([])
+    }).catch(() => setTypes([]))
   }, [])
 
   const navigate = useNavigate()
@@ -42,17 +55,28 @@ const CreateSale: React.FC = () => {
       showError('Producto no disponible', 'Este producto no tiene stock disponible')
       return
     }
+    // Prevent accidental double clicks or duplicate rapid calls
+    const now = Date.now()
+    const key = String(id)
+    const last = lastAddRef.current[key] || 0
+    if (now - last < 250) {
+      console.debug('[createSale] addItem ignored (debounce)', { id, now, last })
+      return
+    }
+    lastAddRef.current[key] = now
+
+    // Mark this product as temporarily adding to disable its button in the UI
+    setAddingIds(prev => ({ ...prev, [key]: true }))
+    setTimeout(() => setAddingIds(prev => { const copy = { ...prev }; delete copy[key]; return copy }), 350)
+
+    console.debug('[createSale] addItem called', { id, now })
+
     setItems(prev => {
-      const existingIndex = prev.findIndex(it => it.id_product === id || it.productId === id)
+      const existingIndex = prev.findIndex(it => (it.id_product ?? it.productId ?? it.idProduct) === id)
       if (existingIndex >= 0) {
-        const newItems = [...prev]
-        const currentQty = Number(newItems[existingIndex].quantity || 0)
-        if (currentQty + 1 > stock) {
-          showError('Stock insuficiente', `Máximo ${stock} unidades disponibles`)
-          return prev
-        }
-        newItems[existingIndex].quantity = currentQty + 1
-        return newItems
+        // Already in cart: do not increment here. Quantity should be adjusted from the cart controls.
+        showError('Producto en carrito', 'Este producto ya está en el carrito. Ajusta la cantidad desde el panel del carrito.')
+        return prev
       }
       return [...prev, { productId: id, idProduct: id, id_product: id, quantity: 1, price, unit_price: price }]
     })
@@ -156,10 +180,38 @@ const CreateSale: React.FC = () => {
                   <p>No hay productos disponibles</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-auto pr-2">
-                  {products.map((p: any) => {
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 bg-popover p-2 rounded w-full max-w-md">
+                      <Search className="w-4 h-4 text-foreground/60" />
+                      <Input placeholder="Buscar por nombre..." value={query} onChange={e => setQuery(e.target.value)} />
+                    </div>
+                    <div>
+                      <Select value={typeFilter} onValueChange={val => setTypeFilter(val)}>
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="Filtrar por tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {types.map((t:any) => (
+                            <SelectItem key={t.id_type ?? t.id} value={String(t.id_type ?? t.id)}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-auto pr-2">
+                  {products
+                    .filter((p: any) => {
+                      const matchesQuery = !query || (p.name || '').toLowerCase().includes(query.toLowerCase())
+                      const matchesType = typeFilter === 'all' || String(p.id_type ?? p.idType ?? p.typeId ?? p.id_product_type ?? p.id) === String(typeFilter)
+                      return matchesQuery && matchesType
+                    })
+                    .map((p: any) => {
                     const stock = Number(p.stock ?? 0)
                     const unavailable = stock <= 0
+                    const inCart = items.some(it => (it.id_product ?? it.productId ?? it.idProduct) === (p.id_product ?? p.id))
                     return (
                       <div
                         key={p.id_product ?? p.id}
@@ -174,19 +226,21 @@ const CreateSale: React.FC = () => {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <div className="text-primary font-semibold text-sm">${Number(p.price || 0).toFixed(2)}</div>
+                          <div className="text-primary font-semibold text-sm">Bs {Number(p.price || 0).toFixed(2)}</div>
                           <Button
-                            disabled={unavailable || loading}
+                            disabled={unavailable || loading || Boolean(addingIds[String(p.id_product ?? p.id)]) || inCart}
                             size="sm"
                             variant={unavailable ? 'outline' : 'default'}
                             className="h-8 text-xs"
                             onClick={() => addItem(p)}
                           >
                             {unavailable ? 'Agotado' : (
-                              <>
-                                <Plus className="w-3 h-3 mr-1" />
-                                Agregar
-                              </>
+                              inCart ? 'En carrito' : (
+                                <>
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Agregar
+                                </>
+                              )
                             )}
                           </Button>
                         </div>
@@ -194,6 +248,7 @@ const CreateSale: React.FC = () => {
                     )
                   })}
                 </div>
+                  </>
               )}
             </CardContent>
           </Card>
@@ -204,7 +259,7 @@ const CreateSale: React.FC = () => {
           <Card className="sticky top-6">
             <CardHeader className="bg-gradient-to-r from-primary to-primary/90 text-white rounded-t-lg">
               <CardTitle className="text-lg">Carrito de venta</CardTitle>
-              <CardDescription className="text-white/80">{items.length} item{items.length !== 1 ? 's' : ''}</CardDescription>
+              <CardDescription className="text-white/80">{`${items.length} item${items.length !== 1 ? 's' : ''}`}</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               {items.length === 0 ? (
@@ -223,7 +278,7 @@ const CreateSale: React.FC = () => {
                           <div className="flex-1">
                             <div className="font-medium text-sm text-foreground">{productName}</div>
                             <Badge variant="outline" className="mt-1 text-xs">
-                              ${Number(it.price).toFixed(2)} c/u
+                              Bs {Number(it.price).toFixed(2)} c/u
                             </Badge>
                           </div>
                           <Button
@@ -245,7 +300,7 @@ const CreateSale: React.FC = () => {
                             disabled={loading}
                           />
                           <div className="text-sm text-foreground/70">=</div>
-                          <div className="text-sm font-semibold text-primary">${subtotal.toFixed(2)}</div>
+                          <div className="text-sm font-semibold text-primary">Bs {subtotal.toFixed(2)}</div>
                         </div>
                       </div>
                     )
@@ -257,7 +312,7 @@ const CreateSale: React.FC = () => {
               <div className="mt-6 pt-4 border-t border-border">
                 <div className="mb-4">
                   <p className="text-sm text-foreground/70">Total a cobrar</p>
-                  <p className="text-3xl font-bold text-primary">${total.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-primary">Bs {total.toFixed(2)}</p>
                 </div>
                 <Button
                   onClick={submit}

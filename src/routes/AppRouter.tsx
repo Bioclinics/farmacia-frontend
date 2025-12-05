@@ -13,6 +13,7 @@ import Exits from '../pages/Inventory/Exits'
 import AdminUsers from '../pages/Admin/Users'
 import ProductTypes from '../pages/Admin/ProductTypes'
 import Laboratories from '../pages/Admin/Laboratories'
+import Brands from '../pages/Admin/Brands'
 
 const AppRouter: React.FC = () => {
   const { token, ready, user } = useContext(AuthContext)
@@ -39,6 +40,7 @@ const AppRouter: React.FC = () => {
               <Route path="usuarios" element={<AdminUsers />} />
               <Route path="tipos-productos" element={<ProductTypes />} />
               <Route path="laboratorios" element={<Laboratories />} />
+              <Route path="marcas" element={<Brands />} />
             </>
           )}
           <Route path="entradas" element={<Entries />} />

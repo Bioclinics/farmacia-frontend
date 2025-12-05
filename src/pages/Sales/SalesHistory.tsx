@@ -41,9 +41,11 @@ const SalesHistory: React.FC = () => {
       const arr = Array.isArray(data) ? data : data.items || []
       // Ordenar por más recientes primero (descendente)
       const sorted = arr.slice().sort((a: any, b: any) => {
-        const da = new Date(a.createdAt || a.created_at || 0).getTime()
-        const db = new Date(b.createdAt || b.created_at || 0).getTime()
-        return db - da  // db - da para orden descendente (más recientes primero)
+        const daDate = parseDate(a.createdAt ?? a.created_at ?? null)
+        const dbDate = parseDate(b.createdAt ?? b.created_at ?? null)
+        const da = daDate ? daDate.getTime() : 0
+        const db = dbDate ? dbDate.getTime() : 0
+        return db - da // db - da para orden descendente (más recientes primero)
       })
       setItems(sorted)
     } catch (err) {
@@ -90,17 +92,51 @@ const SalesHistory: React.FC = () => {
   }
 
   const formatCurrency = (value: number | string) => {
-    return `$${Number(value).toFixed(2)}`
+    return `Bs ${Number(value).toFixed(2)}`
   }
 
   const formatDate = (date: any) => {
-    return new Date(date).toLocaleDateString('es-ES', {
+    const d = parseDate(date)
+    if (!d) return '-' 
+    return d.toLocaleDateString('es-ES', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })
+  }
+
+  const parseDate = (input: any): Date | null => {
+    if (input === null || typeof input === 'undefined') return null
+    // If already a Date
+    if (input instanceof Date) {
+      return isNaN(input.getTime()) ? null : input
+    }
+    // Numbers (timestamp seconds or ms)
+    if (typeof input === 'number') {
+      // if looks like seconds (10 digits) convert to ms
+      if (String(input).length === 10) return new Date(input * 1000)
+      return new Date(input)
+    }
+    if (typeof input === 'string') {
+      const s = input.trim()
+      if (!s) return null
+      // pure numeric string -> timestamp
+      if (/^\d+$/.test(s)) {
+        const n = Number(s)
+        if (s.length === 10) return new Date(n * 1000)
+        return new Date(n)
+      }
+      // common DB format 'YYYY-MM-DD HH:mm:ss' -> replace space with 'T'
+      const replaced = s.replace(' ', 'T')
+      const d = new Date(replaced)
+      if (!isNaN(d.getTime())) return d
+      // fallback: try Date constructor directly
+      const d2 = new Date(s)
+      return isNaN(d2.getTime()) ? null : d2
+    }
+    return null
   }
 
   return (

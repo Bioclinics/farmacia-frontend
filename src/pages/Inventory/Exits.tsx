@@ -47,9 +47,35 @@ const Exits: React.FC = () => {
       const data = await inventoryApi.exits()
       // normalize and sort by date descending (most recent first)
       const arr = Array.isArray(data) ? data : data.items || []
+      const parseDate = (input: any): Date | null => {
+        if (input === null || typeof input === 'undefined') return null
+        if (input instanceof Date) return isNaN(input.getTime()) ? null : input
+        if (typeof input === 'number') {
+          if (String(input).length === 10) return new Date(input * 1000)
+          return new Date(input)
+        }
+        if (typeof input === 'string') {
+          const s = input.trim()
+          if (!s) return null
+          if (/^\d+$/.test(s)) {
+            const n = Number(s)
+            if (s.length === 10) return new Date(n * 1000)
+            return new Date(n)
+          }
+          const replaced = s.replace(' ', 'T')
+          const d = new Date(replaced)
+          if (!isNaN(d.getTime())) return d
+          const d2 = new Date(s)
+          return isNaN(d2.getTime()) ? null : d2
+        }
+        return null
+      }
+
       const normalized = arr.slice().sort((a: any, b: any) => {
-        const da = new Date(a.createdAt || a.date || 0).getTime()
-        const db = new Date(b.createdAt || b.date || 0).getTime()
+        const daDate = parseDate(a.createdAt ?? a.date ?? null)
+        const dbDate = parseDate(b.createdAt ?? b.date ?? null)
+        const da = daDate ? daDate.getTime() : 0
+        const db = dbDate ? dbDate.getTime() : 0
         return db - da
       })
       setItems(normalized)
@@ -105,11 +131,37 @@ const Exits: React.FC = () => {
   }
 
   const formatCurrency = (value: number | string) => {
-    return `$${Number(value).toFixed(2)}`
+    return `Bs ${Number(value).toFixed(2)}`
   }
 
   const formatDate = (date: any) => {
-    return new Date(date).toLocaleDateString('es-ES', {
+    const parse = (input: any): Date | null => {
+      if (input === null || typeof input === 'undefined') return null
+      if (input instanceof Date) return isNaN(input.getTime()) ? null : input
+      if (typeof input === 'number') {
+        if (String(input).length === 10) return new Date(input * 1000)
+        return new Date(input)
+      }
+      if (typeof input === 'string') {
+        const s = input.trim()
+        if (!s) return null
+        if (/^\d+$/.test(s)) {
+          const n = Number(s)
+          if (s.length === 10) return new Date(n * 1000)
+          return new Date(n)
+        }
+        const replaced = s.replace(' ', 'T')
+        const d = new Date(replaced)
+        if (!isNaN(d.getTime())) return d
+        const d2 = new Date(s)
+        return isNaN(d2.getTime()) ? null : d2
+      }
+      return null
+    }
+
+    const d = parse(date)
+    if (!d) return '-'
+    return d.toLocaleDateString('es-ES', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',

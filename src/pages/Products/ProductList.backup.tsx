@@ -54,7 +54,7 @@ const ProductList: React.FC = () => {
                   <div className="text-sm text-gray-600">Stock: <span className="font-medium text-gray-800">{p.stock ?? p.quantity ?? '-'}</span></div>
                   <div className="text-right">
                     <div className="text-sm text-gray-500">Precio</div>
-                    <div className="text-lg font-bold text-sky-700">{typeof p.price !== 'undefined' ? `$ ${Number(p.price).toFixed(2)}` : '-'}</div>
+                    <div className="text-lg font-bold text-sky-700">{typeof p.price !== 'undefined' ? `Bs ${Number(p.price).toFixed(2)}` : '-'}</div>
                   </div>
                 </div>
               </div>

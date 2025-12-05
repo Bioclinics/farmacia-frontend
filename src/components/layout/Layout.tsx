@@ -15,6 +15,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Tags,
 } from 'lucide-react'
 
 interface SidebarLink {
@@ -45,6 +46,7 @@ const Sidebar: React.FC = () => {
     { name: 'Usuarios', icon: <Users className="w-5 h-5" />, key: 'usuarios', to: '/usuarios', section: 'admin' },
     { name: 'Tipos de Productos', icon: <Settings className="w-5 h-5" />, key: 'tipos-productos', to: '/tipos-productos', section: 'admin' },
     { name: 'Laboratorios', icon: <Settings className="w-5 h-5" />, key: 'laboratorios', to: '/laboratorios', section: 'admin' },
+    { name: 'Marcas', icon: <Tags className="w-5 h-5" />, key: 'marcas', to: '/marcas', section: 'admin' },
   ]
 
   const handleLogout = () => {
