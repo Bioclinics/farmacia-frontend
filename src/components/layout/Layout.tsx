@@ -36,7 +36,7 @@ const Sidebar: React.FC = () => {
     { name: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, key: 'dashboard', to: '/' },
     { name: 'Productos', icon: <Package className="w-5 h-5" />, key: 'productos', to: '/productos' },
     { name: 'Hacer venta', icon: <ShoppingCart className="w-5 h-5" />, key: 'crear-venta', to: '/ventas/crear', section: 'staff' },
-    { name: 'Historial ventas', icon: <FileText className="w-5 h-5" />, key: 'ventas', to: '/ventas' },
+    { name: 'Reporte de ventas', icon: <FileText className="w-5 h-5" />, key: 'ventas', to: '/ventas' },
     { name: 'Entradas', icon: <Inbox className="w-5 h-5" />, key: 'entradas', to: '/entradas' },
     { name: 'Salidas', icon: <CheckCircle2 className="w-5 h-5" />, key: 'salidas', to: '/salidas' },
   ]

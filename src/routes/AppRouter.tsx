@@ -6,7 +6,7 @@ import ProductList from '../pages/Products/ProductList'
 import Login from '../pages/Auth/Login'
 import RegisterAdmin from '../pages/Auth/RegisterAdmin'
 import CreateSale from '../pages/Sales/CreateSale'
-import SalesHistory from '../pages/Sales/SalesHistory'
+import SalesReport from '../pages/Sales/SalesReport'
 import Entries from '../pages/Inventory/Entries'
 import Dashboard from '../pages/Dashboard'
 import Exits from '../pages/Inventory/Exits'
@@ -33,7 +33,7 @@ const AppRouter: React.FC = () => {
           {(user?.idRole === 3 || user?.idRole === 2) && (
             <Route path="ventas/crear" element={<CreateSale />} />
           )}
-          <Route path="ventas" element={<SalesHistory />} />
+          <Route path="ventas" element={<SalesReport />} />
           {user?.idRole === 2 && (
             <>
               <Route path="staff/create" element={<RegisterAdmin />} />
